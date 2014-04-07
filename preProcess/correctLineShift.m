@@ -10,7 +10,7 @@ wCrop = ceil(origW*0.15);
 
 % Find optimal shift by calculating difference between unshifted odd lines
 % and shifted even lines for different shift values:
-maxAbsShift = 2;
+maxAbsShift = 3;
 sh          = -maxAbsShift:1:maxAbsShift;
 nSh         = numel(sh);
 movOrig     = reshape(mov(hCrop:2:end+1-hCrop, wCrop:end+1-wCrop, :), [], origZ);
