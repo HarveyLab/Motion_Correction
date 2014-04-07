@@ -1,5 +1,6 @@
-
-function [xshifts,yshifts,correlation_thresholds]=track_subpixel_wholeframe_motion_varythresh(movref,refframe,maxshift,correlation_threshold,min_samples)
+function [xshifts, yshifts, correlation_thresholds] = ...
+    track_subpixel_wholeframe_motion_varythresh(...
+    movref, refframe, maxshift, correlation_threshold, min_samples, showFigures)
 %[xshifts,yshifts]=track_subpixel_wholeframe_motion(movref,refframenum,maxshift);
 %find the offsets (xshifts,yshifts) of the movie given by movref
 %this is accomplished by comparing a reference frame (indexed by refframenum)
@@ -16,6 +17,10 @@ function [xshifts,yshifts,correlation_thresholds]=track_subpixel_wholeframe_moti
 
 %use a nifty waitbar to track progress
 %h=waitbar(0,'Initializing variables');
+
+if ~exist('showFigures', 'var')
+    showFigures = true;
+end
 
 %the total number of shifts in x or y that will be considered
 numshifts=2*maxshift+1;
@@ -161,30 +166,31 @@ for i=1:z
 
 end
 
-%plot the motion over time
-figure(100);
-clf;
-hold on;
-plot(1:z,xshifts,1:z,yshifts)
-title('Frame Displacements');
-legend('X','Y');
-xlabel('Frame Number');
-ylabel('Displacement (pixels)');
+if showFigures
+    %plot the motion over time
+    figure(100);
+    clf;
+    hold on;
+    plot(1:z,xshifts,1:z,yshifts)
+    title('Frame Displacements');
+    legend('X','Y');
+    xlabel('Frame Number');
+    ylabel('Displacement (pixels)');
 
-figure(101);
-clf;
-plot(1:z,numsamples);
-title('Number of samples in centroid');
-xlabel('Frame Number');
-ylabel('Samples');
+    figure(101);
+    clf;
+    plot(1:z,numsamples);
+    title('Number of samples in centroid');
+    xlabel('Frame Number');
+    ylabel('Samples');
 
-figure(102);
-clf;
-plot(1:z,correlation_thresholds);
-title('Thresholds used');
-xlabel('Frame Number');
-ylabel('Correlation Threshold');
-
+    figure(102);
+    clf;
+    plot(1:z,correlation_thresholds);
+    title('Thresholds used');
+    xlabel('Frame Number');
+    ylabel('Correlation Threshold');
+end
 
 
 %close the waitbar
