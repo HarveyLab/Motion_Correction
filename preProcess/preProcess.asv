@@ -9,6 +9,8 @@ function preProcess(path, suffix, binFactor)
 %
 % Optionally, pixel binning is applied.
 
+% TODO: Make command line information output nicer.
+
 if ~exist('suffix', 'var') || isempty(suffix)
     suffix = '';
 end
@@ -27,10 +29,16 @@ folder = fileparts(path);
 
 for f = ls'
     [~, fNameBase, ext] = fileparts(f.name);
+    if ~isempty(suffix)
+        fNameBase = [fNameBase, '_', suffix];
+    end
     
-    if ~(strcmpi(ext, '.tif') || sstrcmp
+    % Skip non-tiff files:
+    if ~(strcmpi(ext, '.tif') || strcmpi(ext, '.tiff'))
+        continue
+    end
     
-    
+    % Load files:
     [mov, siStruct] = tiffRead(fullfile(folder, f.name), 'uint16');
     siStruct = siStruct.(cell2mat(fieldnames(siStruct))); % Remove unnecessary layer in scanimage struct.
     
@@ -42,29 +50,89 @@ for f = ls'
     
     %% Spatial binning:
     if binFactor > 1
-        mov = binMov(mov, binFactor);
+        mov = binSpatial(mov, binFactor);
     end
     
     %% Split data into channels/slices:
-    % Nomencalture: frames and slices refer to the concepts used in
+    % Nomenclature: frames and slices refer to the concepts used in
     % ScanImage. For clarity, the z-dimenstion in the tiff is therefore
     % called "tiffPage" here.
     [height, width, nTiffPages] = size(mov);
-    nChannels = numel(siStruct.channelsSave);
-    nSlices = siStruct.stackNumSlices; % Slices are acquired at different locations (e.g. depths).
-    nFrames = nTiffPages/(nChannels*nSlices); % Frames are acquired at same locations.
+    fZ              = siStruct.fastZEnable;
+    nChannels       = numel(siStruct.channelsSave);
+    nSlices         = siStruct.stackNumSlices + (fZ*siStruct.fastZDiscardFlybackFrames); % Slices are acquired at different locations (e.g. depths).
+    nFramesAvg      = siStruct.acqNumFrames; % Frames are acquired at same locations.
+    nFramesPerFile  = siStruct.loggingFramesPerFile;
     
-    mov = reshape(mov, height, width, nChannels, nFrames, nSlices);
+    % Check if this is an "anatomical" Z-stack, or a fast volume scan/no
+    % stack at all:
+    isAnatomicalZStack = nSlices>1 && ~siStruct.fastZEnable;
     
-    for sl = 1:nSlices
-        for ch = 1:nChannels
-            if ~isempty(suffix)
-                fNameBase = [fNameBase, suffix];
+    % Deal with the possibility that there is less than one full
+    % nChannels*nFramesAvg*nSlices package per file:
+    if nFramesPerFile < nChannels*nFramesAvg*nSlices
+        mov = reshape(mov, height, width, nChannels, min(nFramesAvg, nFramesPerFile), []);
+        nSlices = size(mov, 5);
+    else
+        mov = reshape(mov, height, width, nChannels, min(nFramesAvg, nFramesPerFile), nSlices, []);
+    end
+    
+    if isAnatomicalZStack
+        % If this is an anatopical Z-stack, just average across "frames" to
+        % output a stack of "slices":
+        % First, motion-correct frames within each slice:
+        mov = motionCorrectFrames(mov);
+        
+        % Second, average across slice and concatenate:
+        if ~exist('movMean', 'var')
+            movMean = mean(mov, 4);
+        else
+            movMean = cat(5, movMean, mean(mov, 4));
+        end
+    else
+        for sl = 1:nSlices-(fZ*siStruct.fastZDiscardFlybackFrames)
+            for ch = 1:nChannels            
+                fName = sprintf('%s_slice%1.0f_ch%1.0f%s', fNameBase, sl, ch, ext);
+
+                tiffWrite(reshape(mov(:,:,ch,:,sl,:), height, width, []), ...
+                    fName, fullfile(folder, 'processed'));
             end
-            
-            fName = sprintf('%s_slice%1.0f_ch%1.0f%s', fNameBase, sl, ch, ext);
-            tiffWrite(reshape(mov(:,:,ch,:,sl), height, width, nFrames), ...
-                fullfile(folder, 'processed', fName));
+        end
+    end
+end
+
+if isAnatomicalZStack
+    for ch = 1:nChannels            
+        fName = sprintf('%s_zStack_ch%1.0f%s', fNameBase, ch, ext);
+
+        tiffWrite(reshape(movMean(:,:,ch,:,:,:), height, width, []), ...
+            fName, fullfile(folder, 'processed'));
+    end
+end
+
+
+function mov = motionCorrectFrames(mov)
+[height, width, nChannels, nFramesAvg, nSlices] = size(mov);
+R = imref2d([width,height]);
+crop = round(width*0.1);
+movAlign = single(mov(:, crop:end-crop, :, :, :, :));
+movAlign = squeeze(max(movAlign, [], 3)); 
+for sl = 1:nSlices
+
+    % Max across channels (for motion detection only):
+    alignTarget = median(movAlign(:, :, sl, [1 end]), 4);
+
+    [x, y] = track_subpixel_wholeframe_motion_varythresh(...
+        squeeze(movAlign(:, :, sl, :)), alignTarget, 5, 0.9, 100, false);
+
+    for ch = 1:nChannels
+        for frame = 1:nFramesAvg
+            A = eye(3);
+            A(3,1) = x(frame);
+            A(3,2) = y(frame);
+            tform = affine2d(A);
+            mov(:,:,ch,frame,sl) = imwarp(mov(:,:,ch,frame,sl), ...
+                tform, 'OutputView', R, 'FillValues', nan);   
         end
     end
 end
