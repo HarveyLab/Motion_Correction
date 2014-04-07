@@ -1,4 +1,4 @@
-Motion_Correction
+Affine_Correction
 =================
 
 Code for motion correcting calcium imaging movies.
