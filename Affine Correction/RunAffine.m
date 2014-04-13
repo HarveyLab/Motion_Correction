@@ -48,7 +48,7 @@ while satisfaction == 0
         mixedfilters(badRows,:,:) = [];
     elseif ~isempty(badCols)
         display(sprintf('Erasing Cols %d',badCols)),
-        mixedfilters(:,badRows,:) = [];
+        mixedfilters(:,badCols,:) = [];
     end
 end 
 
