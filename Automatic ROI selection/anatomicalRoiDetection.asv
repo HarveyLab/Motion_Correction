@@ -20,6 +20,7 @@ rho = nPoints:-1:1;
 % Make sure all of the points are within the image bounds:
 rowSub = max(min(round(polY(:)+row), h), 1);
 colSub = max(min(round(polX(:)+col), w), 1);
+
 i = sub2ind(size(img), rowSub, colSub);
 ray = reshape(img(i), nPoints, []);
 

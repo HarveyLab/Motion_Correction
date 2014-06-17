@@ -42,8 +42,21 @@ function anatomicalRoiGui(imgMean, roiLabels, imgSecondary)
 % Scrollwheel   Increase/Decrease size of currently active ROI.
 %
 %
-% TODO:
-% - go through todos in code.
+% WORKING PRINCIPLE:                                                       
+% The roi detection algorithm is based on the doughnut
+% shape of GCaMP- labelled cells (filled cells will not be detected
+% properly). The user clicks on a point to identify the center of a cell.
+% AnatomicalRoiDetect "unwraps" the pixel values from this point outwards
+% onto a cartesian coordinate system where the x axis is the angle and the
+% y axis is the radius from the center of the putative cell. The algorithm
+% then tries to identify the edge of the "doughnut" by finding the first
+% local minimum after the first local maximum along each "ray" emanating
+% from the center of the cell. Other heuristics are used to make the
+% identification more robust. Where no boundary can be detected, gaps are
+% filled by interpolation.
+%
+% TODO: - go through
+% todos in code.
 
 
 if ~exist('imgSecondary', 'var') || isempty(imgSecondary)
