@@ -1,10 +1,26 @@
-function varargout = correctLineShift(mov)
+function varargout = correctLineShift(mov, manualShift)
 % [movCorrected, shifts] = correctLineShift(img) corrects the offset
 % between odd and even image lines caused by bidirectional laser scanning.
 % Apply this correction before any other processing.
 
-% Crop image by 30%:
+if ~exist('manualShift', 'var') || isempty(manualShift)
+    manualShift = NaN;
+end
+
+% Get size:
 [origH, origW, origZ] = size(mov);
+
+if ~isnan(manualShift)
+    % Manual shift only:
+    origShiftedInd = circshift((1:origW)', manualShift);
+    for f = 1:origZ
+        mov(2:2:end, :, f) = mov(2:2:end, origShiftedInd, f);
+    end
+    varargout{1} = mov;
+    return
+end
+
+% Crop image by 30%:
 hCrop = ceil(origH*0.15);
 wCrop = ceil(origW*0.15);
 
@@ -49,8 +65,8 @@ end
 %% Output arguments
 varargout{1} = mov;
 if nargout > 1
-    varargout{1} = sh(iBestSh);
+    varargout{2} = sh(iBestSh);
 end
 if nargout > 2
-    varargout{1} =  bestCorr;
+    varargout{3} =  bestCorr;
 end

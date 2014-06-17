@@ -66,7 +66,8 @@ for f = ls'
     
     % Check if this is an "anatomical" Z-stack, or a fast volume scan/no
     % stack at all:
-    isAnatomicalZStack = nSlices>1 && ~siStruct.fastZEnable;
+%     isAnatomicalZStack = nSlices>1 && ~siStruct.fastZEnable;
+    isAnatomicalZStack = 0; % Dirty fix
     
     % Deal with the possibility that there is less than one full
     % nChannels*nFramesAvg*nSlices package per file:
