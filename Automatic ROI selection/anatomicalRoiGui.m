@@ -180,7 +180,7 @@ else
         gui.roiList(gui.roiList == gui.roiLabels(row, col)) = [];
     end
     
-    gui = anatomicalRoiExtract(gui, row, col, 80, gui.roiSizeOffset);
+    gui = anatomicalRoiDetection(gui, row, col, 80, gui.roiSizeOffset);
 end
 
 

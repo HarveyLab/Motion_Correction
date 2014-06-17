@@ -1,4 +1,4 @@
-function [gui, roiMask] = anatomicalRoiExtract(gui, row, col, radius, roiSizeOffset)
+function [gui, roiMask] = anatomicalRoiDetection(gui, row, col, radius, roiSizeOffset)
 
 
 showFig = 1;
