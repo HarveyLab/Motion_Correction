@@ -104,6 +104,7 @@ gui.imgSecondary = imgSecondary;
 gui.roiLabels = imresize(roiLabels, gui.usFac, 'nearest');
 gui.hFig = figure;
 gui.roiSizeOffset = 0;
+gui.regionRadius = 50; % This is the initial guess, will be "learned" from user input.
 
 % ... figure layout depends on screen orientation:
 screenSize = get(0,'screensize');
@@ -184,6 +185,12 @@ else
         gui.roiList = sort([gui.roiList; freeRoiNumber(1)]);
         gui.imPoly.delete;
         gui.imPoly = impoly.empty;
+        
+        % Update region radius (circle in which the ROI detection happens):
+        if numel(gui.roiList) > 3
+            thisRadius = 2*sqrt(sum(mask(:))/pi); % region radius = 2 * roi radius.
+            gui.regionRadius = round(((numel(gui.roiList)-1)*gui.regionRadius+thisRadius)/numel(gui.roiList));
+        end
     end
     
     if gui.roiLabels(row, col)
@@ -193,7 +200,7 @@ else
         gui.roiList(gui.roiList == gui.roiLabels(row, col)) = [];
     end
     
-    gui = anatomicalRoiDetection(gui, row, col, 80, gui.roiSizeOffset);
+    gui = anatomicalRoiDetection(gui, row, col, gui.regionRadius, gui.roiSizeOffset);
 end
 
 
@@ -256,7 +263,7 @@ switch evt.Key
             % Rename existing var:
             evalin('base',[nameForExistingVar '=' varName ';']);
             evalin('base',['clear ' varName]);
-            fprintf('Found existing SN in base workspace. Renamed old sn to ''%s''\n', nameForExistingVar)
+            fprintf('Found existing roiLabels in base workspace. Renamed old roiLabels to ''%s''\n', nameForExistingVar)
         end
         
         % Turn last impoly into a roi:
@@ -321,7 +328,7 @@ if gui.secondaryImgInd
     % Display chosen secondary image:
     if ~isfield(gui.temp, 'cdataSecondaryImg') || isempty(gui.temp.cdataSecondaryImg)
         for i = 1:size(gui.imgSecondary, 3)
-            gui.temp.cdataSecondaryImg(:,:,1) = scaleImg(gui.imgSecondary(:,:,i));
+            gui.temp.cdataSecondaryImg(:,:,1) = scaleImg(adapthisteq(scaleImg(gui.imgSecondary(:,:,i))));
         end
     end
     cdata = repmat(gui.temp.cdataSecondaryImg(:,:,gui.secondaryImgInd), [1 1 3]);

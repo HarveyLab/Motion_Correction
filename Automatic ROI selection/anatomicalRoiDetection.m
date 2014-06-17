@@ -11,7 +11,7 @@ nRays = 300;
 
 % nPoints determines the radius of the captured circle. This should contain
 % the entire cell:
-nPoints = radius*0.6;
+nPoints = radius;
 theta = linspace(0, 2*pi, nRays);
 rho = nPoints:-1:1;
 [thetaGrid, rhoGrid] = meshgrid(theta, rho);
