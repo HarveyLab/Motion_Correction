@@ -1,0 +1,19 @@
+function score = doughnutObjectiveFunv2(x, ray, nRays, nPoints)
+
+% Parameters:
+% 1 - outer sin offset
+% 2 - outer sin amplitude
+% 3 - outer sin shift
+% 4 - inner sin offset (must be < x(1))
+th = (2*pi)/nRays:(2*pi)/nRays:2*pi;
+
+outer = x(1) + x(2)*sin(th+x(3));
+inner = x(4) + x(2)*sin(th+x(3));
+
+
+indOut = bsxfun(@(o, ptInd) ptInd<o, outer, (1:nPoints)');
+indIn  = bsxfun(@(i, ptInd) ptInd<i, inner, (1:nPoints)');
+
+score = sum(sum(ray(indOut))) - sum(sum(ray(indIn)));
+
+score = -score.^2;
