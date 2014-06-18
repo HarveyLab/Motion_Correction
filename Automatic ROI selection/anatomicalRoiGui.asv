@@ -83,8 +83,8 @@ gui = struct;
 imgMean(isnan(imgMean)) = 0;
 
 % Unsharp mask:
-sd = max(h, w)/256; % Empirical: 1 px blurring for 256 pixel images.
-img = scaleImg(imgMean./imgGaussBlur(imgMean, sd));
+sd = max(h, w)/256; % Empirical: 1.5 px blurring for 256 pixel images.
+img = scaleImg(imgMean./imgGaussBlur(imgMean, 1.5*sd));
 
 % Increase image contrast:
 clipPercent = 0.1;
@@ -102,7 +102,7 @@ end
 gui.img = img;
 gui.imgSecondary = imgSecondary;
 gui.roiLabels = imresize(roiLabels, gui.usFac, 'nearest');
-gui.hFig = figure;
+gui.hFig = figure('name', 'ROI selection GUI');
 gui.roiSizeOffset = 0;
 gui.regionRadius = 50; % This is the initial guess, will be "learned" from user input.
 
@@ -176,20 +176,16 @@ else
     if ~isempty(gui.imPoly)
         % Turn impoly into a roi:
         mask = gui.imPoly.createMask(gui.hImgMain);
-        if ~isempty(gui.roiList)
-            freeRoiNumber = setdiff(1:max(gui.roiList)+1, gui.roiList);
-        else
-            freeRoiNumber = 1;
-        end
-        gui.roiLabels(mask) = freeRoiNumber(1);
-        gui.roiList = sort([gui.roiList; freeRoiNumber(1)]);
+        nextRoiId = max(gui.roiList)+1;
+        gui.roiLabels(mask) = nextRoiId;
+        gui.roiList = [gui.roiList, nextRoiId];
         gui.imPoly.delete;
         gui.imPoly = impoly.empty;
         
         % Update region radius (circle in which the ROI detection happens):
         if numel(gui.roiList) > 3
             thisRadius = 2*sqrt(sum(mask(:))/pi); % region radius = 2 * roi radius.
-            gui.regionRadius = round(((numel(gui.roiList)-1)*gui.regionRadius+thisRadius)/numel(gui.roiList))
+            gui.regionRadius = round(((numel(gui.roiList)-1)*gui.regionRadius+thisRadius)/numel(gui.roiList));
         end
     end
     
@@ -263,7 +259,7 @@ switch evt.Key
             % Rename existing var:
             evalin('base',[nameForExistingVar '=' varName ';']);
             evalin('base',['clear ' varName]);
-            fprintf('Found existing SN in base workspace. Renamed old sn to ''%s''\n', nameForExistingVar)
+            fprintf('Found existing roiLabels in base workspace. Renamed old roiLabels to ''%s''\n', nameForExistingVar)
         end
         
         % Turn last impoly into a roi:
@@ -328,7 +324,7 @@ if gui.secondaryImgInd
     % Display chosen secondary image:
     if ~isfield(gui.temp, 'cdataSecondaryImg') || isempty(gui.temp.cdataSecondaryImg)
         for i = 1:size(gui.imgSecondary, 3)
-            gui.temp.cdataSecondaryImg(:,:,1) = ascaleImg(gui.imgSecondary(:,:,i));
+            gui.temp.cdataSecondaryImg(:,:,1) = scaleImg(adapthisteq(scaleImg(gui.imgSecondary(:,:,i))));
         end
     end
     cdata = repmat(gui.temp.cdataSecondaryImg(:,:,gui.secondaryImgInd), [1 1 3]);
@@ -389,7 +385,7 @@ pos = bsxfun(@minus, pos, meanPos);
 pos = bsxfun(@plus, pos, meanPos);
 
 function img = imgGaussBlur(img, sd)
-f = fspecial('gaussian', min(round(50*sd), min(size(img))), round(sd));
+f = fspecial('gaussian', min(round(100*sd), min(size(img))), round(sd));
 img = imfilter(img, f);
 
 

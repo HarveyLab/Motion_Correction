@@ -83,8 +83,8 @@ gui = struct;
 imgMean(isnan(imgMean)) = 0;
 
 % Unsharp mask:
-sd = max(h, w)/256; % Empirical: 1 px blurring for 256 pixel images.
-img = scaleImg(imgMean./imgGaussBlur(imgMean, sd));
+sd = max(h, w)/256; % Empirical: 1.5 px blurring for 256 pixel images.
+img = scaleImg(imgMean./imgGaussBlur(imgMean, 1.5*sd));
 
 % Increase image contrast:
 clipPercent = 0.1;
@@ -102,7 +102,7 @@ end
 gui.img = img;
 gui.imgSecondary = imgSecondary;
 gui.roiLabels = imresize(roiLabels, gui.usFac, 'nearest');
-gui.hFig = figure;
+gui.hFig = figure('name', 'ROI selection GUI');
 gui.roiSizeOffset = 0;
 gui.regionRadius = 50; % This is the initial guess, will be "learned" from user input.
 
@@ -176,13 +176,14 @@ else
     if ~isempty(gui.imPoly)
         % Turn impoly into a roi:
         mask = gui.imPoly.createMask(gui.hImgMain);
-        if ~isempty(gui.roiList)
-            freeRoiNumber = setdiff(1:max(gui.roiList)+1, gui.roiList);
+        
+        if isempty(gui.roiList)
+            nextRoiId = 1;
         else
-            freeRoiNumber = 1;
+            nextRoiId = max(gui.roiList)+1;
         end
-        gui.roiLabels(mask) = freeRoiNumber(1);
-        gui.roiList = sort([gui.roiList; freeRoiNumber(1)]);
+        gui.roiLabels(mask) = nextRoiId;
+        gui.roiList(end+1) = nextRoiId;
         gui.imPoly.delete;
         gui.imPoly = impoly.empty;
         
@@ -196,17 +197,12 @@ else
     if gui.roiLabels(row, col)
         % Click was inside an existing ROI: delete that ROI and turn it
         % into an impoly again:
-        gui.roiLabels(gui.roiLabels == gui.roiLabels(row, col)) = 0;
         gui.roiList(gui.roiList == gui.roiLabels(row, col)) = [];
+        gui.roiLabels(gui.roiLabels == gui.roiLabels(row, col)) = 0;
     end
     
     gui = anatomicalRoiDetection(gui, row, col, gui.regionRadius, gui.roiSizeOffset);
 end
-
-
-
-% gui.nRois = gui.nRois + 1;
-% gui.roiLabels(imgRoi) = gui.nRois;
 
 set(gui.hFig, 'userdata', gui);
 updateDisplay(gui.hFig);
@@ -270,11 +266,12 @@ switch evt.Key
         if ~isempty(gui.imPoly)
             mask = gui.imPoly.createMask(gui.hImgMain); 
             if ~isempty(gui.roiList)
-                freeRoiNumber = setdiff(1:max(gui.roiList)+1, gui.roiList);
+                nextRoiId = max(gui.roiList)+1;
             else
-                freeRoiNumber = 1;
+                nextRoiId = 1;
             end
-            gui.roiLabels(mask) = freeRoiNumber(1);
+            gui.roiLabels(mask) = nextRoiId;
+            gui.roiList(end+1) = nextRoiId;
             gui.imPoly.delete;
             gui.imPoly = impoly.empty;
             set(gui.hFig, 'userdata', gui);
@@ -323,7 +320,7 @@ set(obj, 'userdata', gui);
 function updateDisplay(hFig)
 
 gui = get(hFig, 'userdata');
-
+disp(gui.roiList)
 if gui.secondaryImgInd
     % Display chosen secondary image:
     if ~isfield(gui.temp, 'cdataSecondaryImg') || isempty(gui.temp.cdataSecondaryImg)
@@ -389,7 +386,7 @@ pos = bsxfun(@minus, pos, meanPos);
 pos = bsxfun(@plus, pos, meanPos);
 
 function img = imgGaussBlur(img, sd)
-f = fspecial('gaussian', min(round(50*sd), min(size(img))), round(sd));
+f = fspecial('gaussian', min(round(100*sd), min(size(img))), round(sd));
 img = imfilter(img, f);
 
 
