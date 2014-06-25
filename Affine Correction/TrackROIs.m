@@ -1,4 +1,4 @@
-function TrackSegments(fullfilename,movie_file,maxShift,nSegments)
+function TrackROIs(fullfilename,movie_file,nSegments,segSize)
 
 MovFile = matfile([movie_file '.mat'],'Writable',true);
 %% Load tiff File
@@ -35,62 +35,52 @@ M=movie_mask(3)+1;
 N=movie_mask(4)+1;
 
 %% Construct Movie Segments
-segPos = [];
-switch nSegments
-    case 9
-        xind = floor(linspace(1,M/2,3));
-        yind = floor(linspace(1,N/2,3));
-    case 6
-        xind = floor(linspace(1,M/2,2));
-        yind = floor(linspace(1,N/2,3));
-    case 4
-        xind = floor(linspace(1,M/2,2));
-        yind = floor(linspace(1,N/2,2));  
+if isempty(MovFile.segPos),
+    ref = double(median(mov,3));
+    inF = fspecial('gaussian',25,3);
+    outF = fspecial('gaussian',25,6);
+    ref = abs(imfilter(ref,inF-outF));
+    ref=ref-min(ref(:));
+    ref = ref/max(ref(:));
+    ref = adapthisteq(ref);
+    ref = imfilter(ref,inF);
+    segCenters = imregionalmax(ref);
+    [yInd , xInd] = find(segCenters);
+    badX = find(xInd < segSize/2 | xInd>M-segSize/2);
+    badY = find(yInd < segSize/2 | yInd>N-segSize/2);
+    vals = ref(segCenters(:));
+    vals(union(badX,badY))=0;
+    segInd = find(vals>prctile(vals,(1-nSegments/length(vals))*100));
+    xInd = xInd(segInd);
+    yInd = yInd(segInd);
+    segPos = [xInd-fix(segSize/2)+1 yInd-fix(segSize/2)+1 ones(length(segInd),2)*(segSize-1)];
+    nSeg = size(segPos,1);
+    MovFile.segPos = segPos;
+else
+    segPos = MovFile.segPos;
+    nSeg = size(segPos,1);
 end
-        
-for x=1:length(xind)
-    for y=1:length(yind)
-        segPos(end+1,:) = [xind(x) yind(y)  floor(M/2) floor(N/2)];
-    end
-end
-nSeg = size(segPos,1);
-MovFile.segPos = segPos;
 
 %% First order motion correction
 %Break Movie into Sliced Segments and clear original
 for Seg = 1:nSeg
     MovCell{Seg} = mov(segPos(Seg,2):segPos(Seg,2)+segPos(Seg,4),segPos(Seg,1):segPos(Seg,1)+segPos(Seg,3),:);
 end
-clear mov,
 
 parfor Seg = 1:nSeg
     display(sprintf('Segment: %d',Seg)),
     tMov = MovCell{Seg};
-    tFrame = mean(tMov,3); 
-    tBase = prctile(tFrame(:),1);
-    tTop = prctile(tFrame(:),95);
-    tMov = (tMov - tBase) / (tTop-tBase);
-    tMov(tMov<0) = 0; tMov(tMov>1) = 1;
-[xshifts(Seg,:),yshifts(Seg,:)]=track_subpixel_wholeframe_motion_varythresh(...
-    tMov,median(tMov,3),maxShift,0.9,100);
+    [xshifts(Seg,:),yshifts(Seg,:)]=track_subpixel_wholeframe_motion_fft(tMov, median(tMov,3));
 end
-
-%rebuild movie from segments and clear segs
-switch nSegments
-    case 9
-        UpLeft = 1; DownLeft = 3; UpRight = 7; DownRight = 9;
-    case 6
-        UpLeft = 1; DownLeft = 3; UpRight = 4; DownRight = 6;
-    case 4
-        UpLeft = 1; DownLeft = 2; UpRight = 3; DownRight = 4; 
-end
-
-mov = cat(2,cat(1,MovCell{UpLeft}(1:end-2,1:end-2,:),MovCell{DownLeft}(1:end,1:end-2,:)),cat(1,MovCell{UpRight}(1:end-2,:,:),MovCell{DownRight}));
 clear MovCell
+badFrames = find(isnan(xshifts+yshifts));
+xshifts(badFrames) = (xshifts(badFrames-nSeg)+xshifts(badFrames+nSeg))/2;
+yshifts(badFrames) = (yshifts(badFrames-nSeg)+yshifts(badFrames+nSeg))/2;
+
 
 %Calculate correction for reference image and crop
 refFrame = median(AcquisitionCorrect(mov,mean(xshifts),mean(yshifts)),3);
-refFrame = refFrame(1+maxShift:end-maxShift,1+maxShift:end-maxShift,:);
+refFrame = refFrame(1+10:end-10,1+10:end-10,:);
 
 %Save results to disk
 acqFrames = MovFile.acqFrames;

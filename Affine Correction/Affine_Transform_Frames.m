@@ -1,4 +1,4 @@
-function Affine_Transform_Frames(apply_filenames,movie_file)
+function Affine_Transform_Frames(apply_filenames,movie_file,transformType)
 
 %% Load variables / reference points
 MovFile = matfile([movie_file '.mat'],'Writable',true);
@@ -6,9 +6,13 @@ movie_mask = MovFile.movie_mask;
 M=movie_mask(1,3)+1;
 N=movie_mask(1,4)+1;
 
+%Forward Compatability for eliminating certain segments from motion correction
+elimSeg = [];
 segPos = MovFile.segPos;
-yoff = segPos(:,2) + floor(segPos(:,4)/2);
-xoff = segPos(:,1) + floor(segPos(:,3)/2);
+useSeg = 1:size(segPos,1);
+useSeg(elimSeg) = [];
+yoff = segPos(useSeg,2) + floor(segPos(useSeg,4)/2);
+xoff = segPos(useSeg,1) + floor(segPos(useSeg,3)/2);
 rpts = [xoff, yoff];
 R=imref2d([N,M]);
 
@@ -25,6 +29,8 @@ for j=1:length(acqFrames)
     ind = sum(acqFrames(1:j-1)) + (1:acqFrames(j));
     xshift = -(MovFile.cated_xShift(:,ind) + xshiftsAcq(j));
     yshift = -(MovFile.cated_yShift(:,ind) + yshiftsAcq(j));
+    xshift = xshift(useSeg,:);
+    yshift = yshift(useSeg,:);
     
     %load Tiffs and Mask
     t=Tiff(apply_filenames{j});
@@ -54,18 +60,30 @@ for j=1:length(acqFrames)
     mov=mov*(meanlastframes/meanfirstframes);
     meanlastframes=median(mean(mean(mov(:,:,end-200:end))));
     
-    % Apply affine transform
+    % Apply affine transform        
+  if strcmp(transformType,'affine')
     parfor frame = 1:Z
-        if mod(frame,250)==1
-            display(sprintf('frame: %d',frame)),
-        end
-        xframe = xshift(:,frame) + xoff;
-        yframe = yshift(:,frame) + yoff;
-        fpts = [xframe, yframe];
-        tform=fitgeotrans(fpts,rpts,'affine');
-        mov(:,:,frame)=imwarp(mov(:,:,frame),tform,'OutputView',R,'FillValues',nan);   
-    end   
-    
+    if mod(frame,250)==1
+        display(sprintf('frame: %d',frame)),
+    end
+    xframe = xshift(:,frame) + xoff;
+    yframe = yshift(:,frame) + yoff;
+    fpts = [xframe, yframe];
+    tform=fitgeotrans(fpts,rpts,'affine');
+    mov(:,:,frame)=imwarp(mov(:,:,frame),tform,'OutputView',R,'FillValues',nan);  
+    end
+  elseif strcmp(transformType,'translation')
+    parfor frame = 1:Z
+    if mod(frame,250)==1
+        display(sprintf('frame: %d',frame)),
+    end
+    tform = affine2d(cat(1,eye(2,3),cat(2,-median(xshift(:,frame)),-median(yshift(:,frame)),1)));
+    mov(:,:,frame)=imwarp(mov(:,:,frame),tform,'OutputView',R,'FillValues',nan); 
+    end
+  else
+      error('Specified Transformation Type Is Not Supported'),
+  end
+          
     %Write to Tiff
     tOut=Tiff(sprintf('%s_Acq%d.tif',movie_file,j),'w');
     tagStruct.RowsPerStrip = 16;
