@@ -22,8 +22,7 @@ end
 % Pre-process movie:
 [w, h, ~] = size(mov);
 logistic = @(x) ((1./(1+exp(-x*(-log(1/3)/(0.5*median(x(1:101:end))))))-0.5)*2); % The term in the exponent input such that "halfMax" input value becomes 0.5 in logistic function output.
-%movLog = logistic(bsxfun(@rdivide, mov, imgGaussBlur(mean(mov, 3), 20)));
-movLog = logistic(bsxfun(@rdivide, mov, imfilter(mean(mov, 3), fspecial('gaussian',20))));
+movLog = logistic(bsxfun(@rdivide, mov, imgGaussBlur(mean(mov, 3), 20)));
 if ~refImg
     refImg = median(movLog, 3);
 end

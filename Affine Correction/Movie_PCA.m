@@ -9,7 +9,6 @@ nAcqs = length(MovFile.acqFrames);
 acqCov = zeros(Z,Z,'single');
 t=Tiff(sprintf('%s_Acq%d.tif',movie_file,1),'r');
 nStrips = t.numberOfStrips;
-nGoodStrips = nStrips;
 nRows = t.getTag('RowsPerStrip');
 blank_frame = MovFile.blank_frame;
 
@@ -34,15 +33,11 @@ parfor strip = 1:nStrips
     pxMean = mean(tMov,2);
     tMov = tMov ./ repmat(pxMean,1,Z) - 1;
     tMov(isnan(pxMean),:) = [];
-    if ~isempty(tMov)
-        acqCov = acqCov + cov(tMov);          
-    else
-        nGoodStrips = nGoodStrips - 1;
-    end
+    acqCov = acqCov + cov(tMov);          
 end
 
 acqCov = double(acqCov);
-acqCov=acqCov / nGoodStrips;
+acqCov=acqCov / nStrips;
 
 display('------------------Computing Eigenvalues------------------')
 [V,D] = eig(acqCov);

@@ -13,6 +13,11 @@ if nargin == 0
     doCcipca = true;
 end
 %% Get list of all files to be processed:
+% TODO: Turn this into a dialog/gui:
+% Temp solution: provide list of folders with data:
+rawFolders = {...
+    'C:\Users\Matthias\Local\Storage\labdata\imaging\MM025\MM025_140530', ...
+    };
 
 % Get list of tif files:
 movMetadata = [];
@@ -20,23 +25,19 @@ movMetadata = [];
 % the struct is the information returned by DIR. More information is then
 % added later. Eventually, a separate .mat file is saved for each element
 % of movMetadata, i.e. for each tif file.
-
-nFolders = 1;
-for thisFolder = 1:nFolders
-    [thisFolderFiles, movDir] = uigetfile(['E:\data\*.tif'],'MultiSelect','on');
-    thisFolderStruct = [];
-    for fileInd = 1:length(thisFolderFiles)
-        thisFolderStruct(fileInd).name = thisFolderFiles{fileInd};
-        thisFolderStruct(fileInd).path = movDir;
-        thisFolderStruct(fileInd).pathAndName = fullfile(movDir, thisFolderFiles{fileInd});
-        t = dir(thisFolderStruct(fileInd).pathAndName);
-        thisFolderStruct(fileInd).date = t.date;
-        thisFolderStruct(fileInd).datenum = t.datenum;
-        thisFolderStruct(fileInd).bytes = t.bytes;
+for f = row(rawFolders)
+    thisFolderList = dir(fullfile(f{:}, '140530_MM025_140530_stimTests_002*.tif'));
+    
+    % Add full file path to each file for convenience and unique id:
+    for i = 1:numel(thisFolderList)
+%         thisFolderList(i).pathAndName = fullfile(f{:}, thisFolderList(i).name);
+        thisFolderList(i).path = f{:};
+        thisFolderList(i).pathAndName = fullfile(f{:}, thisFolderList(i).name);
     end
-    movMetadata = cat(2, movMetadata, thisFolderStruct);
+    
+    % Concatenate into one long list:
+    movMetadata = cat(1, movMetadata, thisFolderList);
 end
-
 % Store the file list separately as well, in case we want to load
 % previously saved metadata from disk (see below):
 rawFileList = movMetadata;
@@ -50,15 +51,9 @@ nRawFiles = numel(movMetadata);
 % TODO: Allow for externally supplied correction file, either in form of a
 % simple image matrix or in form of a previously saved metadata file.
 % Temp: assign reference source to each Tiff manually:
-refInd = 3;
+refInd = 1;
 for i = 1:nRawFiles
     movMetadata(i).refFilePath = movMetadata(refInd).pathAndName;
-    if strcmp(movMetadata(i).refFilePath, ...
-            movMetadata(i).pathAndName)
-        fileIsRef(i) = 1;
-    else
-        fileIsRef(i) = 0;
-    end
 end
 
 % Select which channel to correct on:
@@ -74,8 +69,16 @@ end
 % Now, re-order the files such that the ones that have themselves as a
 % reference source are first, so that they are corrected first and the
 % reference images are then available for the rest:
-movMetadata = [movMetadata(find(fileIsRef)), movMetadata(find(~fileIsRef))];
-
+rawFileListTemp = movMetadata;
+movMetadata = [];
+for i = 1:nRawFiles
+    if strcmp(rawFileListTemp(i).refFilePath, ...
+            rawFileListTemp(i).pathAndName)
+        movMetadata = [rawFileListTemp(i), movMetadata];
+    else
+        movMetadata = [movMetadata, rawFileListTemp(i)];        
+    end
+end
 
 %% Processing loop:
 % "Correction" includes line shift and motion correction.

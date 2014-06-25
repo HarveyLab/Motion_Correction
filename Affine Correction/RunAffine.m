@@ -4,26 +4,25 @@ clear all,
 tic,
 InitMovieFiles,
 
-MovFile.nSegments = 100;
-MovFile.segSize = 50;
-MovFile.TransformType = 'affine'; %Can be affine or translation
+nSegments = 6; %Can only be 9, 6 or 4 at this point, but simple to modify code to allow more
 nPCs = 200;
 PCuse = 1:100;
 mu=.15;
 nIC = length(PCuse);
+maxshift = 5; %Maximum LOCAL (within acquisition) shift. Smaller than maximal GLOBAL shift (including btw acq drift)
 %% Load Individual Sessions and Calculate Segment Shifts
 display('---------------------Tracking Segments-----------------------')
 for j=1:num_files
     j,
     fullfilename = correct_filenames{j};
-    TrackROIs(fullfilename,movie_file,MovFile.nSegments,MovFile.segSize);
+    TrackSegments(fullfilename,movie_file,maxshift,nSegments);
 end
 
 MovFile.acqRef = MovFile.acqRef(:,:,1+(1:length(MovFile.acqFrames)));
 trackTime = toc,
 %% Load and Affine-Correct Each Acquisition
 display('---------------------Applying Motion Correction-----------------------')
-Affine_Transform_Frames(apply_filenames,movie_file,MovFile.TransformType);
+Affine_Transform_Frames(apply_filenames,movie_file);
 transformTime = toc,
 %% Calculate PCs
 display('---------------------Computing Principle Components-----------------------')
@@ -55,15 +54,8 @@ end
 
 [ica_sig, ica_filters, ica_A, numiter] = CellsortICA(...
      mixedsig,mixedfilters, MovFile.CovEvals, PCuse, mu, nIC, [], 5e-7, 1e3);
- smwidth = 5;
-thresh = 3;
-arealims = [20 400];
-plotting = 1;
 [ica_segments, segmentlabel, segcentroid] = CellsortSegmentation...
     (ica_filters, smwidth, thresh, arealims, plotting);
 for i=1:size(ica_segments,1)
     normSeg(:,:,i)=100*ica_segments(i,:,:)/norm(reshape(ica_segments(i,:,:),1,[]));
 end
-
-MovFile.ica_filters = ica_filters;
-MovFile.normSeg = normSeg;

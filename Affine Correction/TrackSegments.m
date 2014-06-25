@@ -57,40 +57,19 @@ nSeg = size(segPos,1);
 MovFile.segPos = segPos;
 
 %% First order motion correction
-%Break Movie into Sliced Segments and clear original
-for Seg = 1:nSeg
-    MovCell{Seg} = mov(segPos(Seg,2):segPos(Seg,2)+segPos(Seg,4),segPos(Seg,1):segPos(Seg,1)+segPos(Seg,3),:);
-end
-clear mov,
-
 parfor Seg = 1:nSeg
     display(sprintf('Segment: %d',Seg)),
-    tMov = MovCell{Seg};
-    tFrame = mean(tMov,3); 
-    tBase = prctile(tFrame(:),1);
-    tTop = prctile(tFrame(:),95);
-    tMov = (tMov - tBase) / (tTop-tBase);
-    tMov(tMov<0) = 0; tMov(tMov>1) = 1;
+    tMov = mov(segPos(Seg,2):segPos(Seg,2)+segPos(Seg,4),segPos(Seg,1):segPos(Seg,1)+segPos(Seg,3),:);
+     tBase = prctile(tMov(:),1);
+     tTop = prctile(tMov(:),99);
+     tMov = (tMov - tBase) / (tTop-tBase);
+     tMov(tMov<0) = 0; tMov(tMov>1) = 1;
 [xshifts(Seg,:),yshifts(Seg,:)]=track_subpixel_wholeframe_motion_varythresh(...
     tMov,median(tMov,3),maxShift,0.9,100);
 end
 
-%rebuild movie from segments and clear segs
-switch nSegments
-    case 9
-        UpLeft = 1; DownLeft = 3; UpRight = 7; DownRight = 9;
-    case 6
-        UpLeft = 1; DownLeft = 3; UpRight = 4; DownRight = 6;
-    case 4
-        UpLeft = 1; DownLeft = 2; UpRight = 3; DownRight = 4; 
-end
-
-mov = cat(2,cat(1,MovCell{UpLeft}(1:end-2,1:end-2,:),MovCell{DownLeft}(1:end,1:end-2,:)),cat(1,MovCell{UpRight}(1:end-2,:,:),MovCell{DownRight}));
-clear MovCell
-
-%Calculate correction for reference image and crop
+%Calculate correction for reference image
 refFrame = median(AcquisitionCorrect(mov,mean(xshifts),mean(yshifts)),3);
-refFrame = refFrame(1+maxShift:end-maxShift,1+maxShift:end-maxShift,:);
 
 %Save results to disk
 acqFrames = MovFile.acqFrames;
@@ -99,4 +78,4 @@ endFrame = startFrame+Z-1;
 MovFile.acqFrames = cat(1,acqFrames,Z);
 MovFile.cated_xShift(1:nSeg,startFrame:endFrame) = xshifts;
 MovFile.cated_yShift(1:nSeg,startFrame:endFrame) = yshifts;
-MovFile.acqRef(1:size(refFrame,1),1:size(refFrame,2),length(MovFile.acqFrames)+1) = refFrame;
+MovFile.acqRef(1:N-10,1:M-10,length(MovFile.acqFrames)+1) = refFrame(1+maxShift:end-maxShift,1+maxShift:end-maxShift,:);
